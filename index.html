@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小布2.0 199中价品直播复盘动态看板</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f7f4;
+  --panel: #ffffff;
+  --ink: #1d2524;
+  --muted: #66716f;
+  --line: #dce2df;
+  --green: #15803d;
+  --red: #c2410c;
+  --blue: #2563eb;
+  --teal: #0f766e;
+  --gold: #b7791f;
+  --rose: #be123c;
+  --shadow: 0 14px 40px rgba(31, 41, 37, .08);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+}
+header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(246, 247, 244, .94);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+}
+.topbar {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 16px 22px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: center;
+}
+h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: 0; }
+.sub { color: var(--muted); font-size: 13px; }
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+select, input[type="date"], button {
+  height: 36px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 0 10px;
+  font: inherit;
+}
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
+.seg button { border: 0; border-radius: 0; border-right: 1px solid var(--line); background: transparent; }
+.seg button:last-child { border-right: 0; }
+.seg button.active { background: var(--ink); color: #fff; }
+main { max-width: 1480px; margin: 0 auto; padding: 18px 22px 36px; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.card, .chart-card, .summary {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.card { padding: 16px; min-height: 116px; }
+.card .label { color: var(--muted); font-size: 13px; }
+.card .value { font-size: 30px; font-weight: 750; margin-top: 10px; }
+.delta { margin-top: 8px; font-size: 13px; font-weight: 650; }
+.up { color: var(--green); }
+.down { color: var(--red); }
+.summary { padding: 14px 16px; margin-bottom: 14px; }
+.summary h2, .chart-card h2 { margin: 0; font-size: 16px; }
+.summary ul { margin: 10px 0 0; padding-left: 18px; color: #31403d; line-height: 1.65; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.chart-card { padding: 14px; min-height: 390px; position: relative; }
+.wide { grid-column: 1 / -1; }
+.chart-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.toggles label { font-size: 12px; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+svg { display: block; width: 100%; height: 310px; overflow: visible; }
+.funnel svg { height: 330px; }
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  background: rgba(29, 37, 36, .94);
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  min-width: 150px;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 10px));
+  transition: opacity .08s;
+}
+.note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.formula-grid, .insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.formula-card, .insight-card {
+  border: 1px solid var(--line);
+  background: #fbfcfb;
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+.formula-card strong, .insight-card strong {
+  display: block;
+  color: var(--ink);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.formula-card code {
+  display: block;
+  color: #31403d;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+}
+.formula-card span, .insight-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+.insight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.insight-card { min-height: 68px; }
+.axis { stroke: #cbd5d1; stroke-width: 1; }
+.gridline { stroke: #edf1ef; stroke-width: 1; }
+.target { stroke: var(--red); stroke-dasharray: 5 4; stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+.explain {
+  display: grid;
+  grid-template-columns: 1.1fr 1.4fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.explain h3 { margin: 0 0 6px; font-size: 13px; }
+.explain p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.score-list { display: grid; gap: 5px; }
+.score-list div { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.score-list b { color: var(--ink); }
+@media (max-width: 980px) {
+  .topbar { grid-template-columns: 1fr; }
+  .controls { justify-content: flex-start; }
+  .kpis, .grid { grid-template-columns: 1fr; }
+  .chart-card { min-height: 360px; }
+  .explain { grid-template-columns: 1fr; }
+  .formula-grid, .insight-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div>
+      <h1>小布2.0 199中价品直播复盘动态看板</h1>
+      <div class="sub">数据源：小布2.0项目管理文档 / 直播数据；口径：2026/5/25 及之后，按日去重聚合，支持按场次切换。</div>
+    </div>
+    <div class="controls">
+      <input id="startDate" type="date">
+      <input id="endDate" type="date">
+      <div class="seg">
+        <button id="dailyBtn" class="active" type="button">按日</button>
+        <button id="sessionBtn" type="button">按场次</button>
+      </div>
+    </div>
+  </div>
+</header>
+<main>
+  <section class="kpis">
+    <div class="card"><div class="label" id="kpiGmvLabel">累计GMV</div><div class="value" id="kpiGmv">-</div><div class="delta" id="kpiGmvDelta">-</div></div>
+    <div class="card"><div class="label" id="kpiRoiLabel">总成交ROI</div><div class="value" id="kpiRoi">-</div><div class="delta" id="kpiRoiDelta">-</div></div>
+    <div class="card"><div class="label">总订单数</div><div class="value" id="kpiOrders">-</div><div class="delta" id="kpiOrdersDelta">-</div></div>
+  </section>
+  <section class="summary">
+    <h2 id="summaryTitle">结论摘要</h2>
+    <ul id="summaryList"></ul>
+  </section>
+  <section class="grid">
+    <article class="chart-card wide">
+      <div class="chart-head">
+        <h2>199中价品成立度趋势</h2>
+        <div class="toggles" data-chart="health">
+          <label><input type="checkbox" value="healthScore" checked>直播健康指数</label>
+          <label><input type="checkbox" value="conversionScore" checked>成交承接分</label>
+          <label><input type="checkbox" value="efficiencyScore" checked>投流效率分</label>
+        </div>
+      </div>
+      <svg id="healthChart"></svg>
+      <div class="formula-grid" aria-label="指数计算公式">
+        <div class="formula-card">
+          <strong>直播健康指数</strong>
+          <code>结果35% + 流量25% + 承接25% + 投流15%</code>
+          <span>看整体模型是否越来越成立</span>
+        </div>
+        <div class="formula-card">
+          <strong>成交承接分</strong>
+          <code>商品点击/20% + 点击成交/8% + 看播成交/1%</code>
+          <span>看流量留下后买不买</span>
+        </div>
+        <div class="formula-card">
+          <strong>投流效率分</strong>
+          <code>净ROI/0.8 + GPM/700 + 7日ROI/0.8 + 350/单订单成本</code>
+          <span>看钱花得值不值；单项满分按100计</span>
+        </div>
+      </div>
+      <div class="explain">
+        <div>
+          <h3>为什么做这个指数</h3>
+          <p>单日 GMV、ROI、点击率都会受场次、投放量和退款影响而大幅波动。成立度趋势把关键指标先统一成分数，用来看这个 199 中价品整体是在变好还是变坏。</p>
+        </div>
+        <div class="score-list">
+          <h3>三个分怎么看</h3>
+          <div><b>直播健康指数：</b>综合结果、流量质量、成交承接、投流效率，是总判断线。</div>
+          <div><b>成交承接分：</b>看商品曝光点击率、点击-成交率、看播-成交率，判断留住后买不买。</div>
+          <div><b>投流效率分：</b>看净成交 ROI、GPM、7 日 ROI、订单成本，判断钱花得值不值。</div>
+        </div>
+        <div>
+          <h3>怎么读这张图</h3>
+          <p>各指标先换算为0-100分，再按结果35%、流量质量25%、成交承接25%、投流效率15%加权。综合线连续上升，说明模型在改善；综合线上升但承接分下降，说明量变好但转化链路要优先调整。</p>
+        </div>
+      </div>
+    </article>
+    <article class="chart-card wide">
+      <div class="chart-head">
+        <h2>1. 结果好不好：GMV + 净成交订单数</h2>
+        <div class="toggles" data-chart="result">
+          <label><input type="checkbox" value="gmv" checked>GMV</label>
+          <label><input type="checkbox" value="netOrders" checked>净成交订单数</label>
+        </div>
+      </div>
+      <svg id="resultChart"></svg>
+      <div class="legend"><span><i class="swatch" style="background:var(--blue)"></i>GMV</span><span><i class="swatch" style="background:var(--teal)"></i>净成交订单数</span></div>
+    </article>
+    <article class="chart-card funnel">
+      <div class="chart-head"><h2>2. 流量留不留得住：转化漏斗</h2></div>
+      <svg id="funnelChart"></svg>
+      <div class="note">展示筛选范围内的合并漏斗，转化率按相邻层级重算。</div>
+      <div class="insight-grid" id="funnelInsight">-</div>
+    </article>
+    <article class="chart-card">
+      <div class="chart-head">
+        <h2>3. 留住了买不买：停留/互动 vs 成交/UV价值</h2>
+        <div class="toggles" data-chart="quality">
+          <label><input type="checkbox" value="avgStaySeconds" checked>停留</label>
+          <label><input type="checkbox" value="interactionRate" checked>互动</label>
+          <label><input type="checkbox" value="clickDealRate" checked>点击成交</label>
+          <label><input type="checkbox" value="uvValue" checked>UV价值</label>
+        </div>
+      </div>
+      <svg id="qualityChart"></svg>
+      <div class="insight-grid" id="qualityInsight">-</div>
+    </article>
+    <article class="chart-card wide">
+      <div class="chart-head">
+        <h2>4. 钱花得值不值：整体消耗 vs ROI / GPM</h2>
+        <div class="toggles" data-chart="spend">
+          <label><input type="checkbox" value="spend" checked>整体消耗</label>
+          <label><input type="checkbox" value="netRoi" checked>净成交ROI</label>
+          <label><input type="checkbox" value="gpm" checked>GPM</label>
+          <label><input type="checkbox" value="sevenDayRoi" checked>7日结算ROI</label>
+        </div>
+      </div>
+      <svg id="spendChart"></svg>
+    </article>
+    <article class="chart-card">
+      <div class="chart-head"><h2>5A. 成交GMV构成：画面 vs 视频</h2></div>
+      <svg id="channelStackChart"></svg>
+    </article>
+    <article class="chart-card">
+      <div class="chart-head"><h2>5B. 渠道ROI对比</h2></div>
+      <svg id="channelRoiChart"></svg>
+    </article>
+  </section>
+</main>
+<div class="tooltip" id="tooltip"></div>
+<script>
+const DASHBOARD_DATA = {"generatedAt":"2026-06-03T06:36:30.190Z","source":{"title":"小布2.0项目管理文档 / 直播数据","spreadsheetToken":"TFogsCQf2hIYeOtH5kwcvLpjn1g","sheetId":"PBMd7n","revision":null,"minDate":"2026-05-25"},"targets":{"staySeconds":80,"exposureWatchRateLow":0.01,"exposureWatchRateHigh":0.02,"interactionRate":0.03,"productClickRate":0.2,"clickDealRate":0.08,"videoClickRate":0.028,"videoConversionRate":0.032},"daily":[{"date":"2026-05-25","label":"05/25","sessions":1,"gmv":199,"netOrders":1,"orders":1,"spend":2600,"exposure":42100,"viewers":1461,"productExposure":3000,"productClicks":86,"buyers":1,"avgStaySeconds":53,"exposureWatchRate":0.03470308788598575,"interactionRate":0.0493,"productClickRate":0.028666666666666667,"clickDealRate":0.011627906976744186,"watchDealRate":0.0006844626967830253,"uvValue":0.13620807665982204,"netRoi":0.07653846153846154,"dailyRoi":0.07653846153846154,"gpm":125.95,"sevenDayRoi":0.08,"screenGmv":199,"videoGmv":0,"screenSpend":2585.41,"videoSpend":9.28,"screenRoi":0.07697038380759726,"videoRoi":0,"videoClickRate":0.1176,"videoConversionRate":0,"resultScore":29.055659787367105,"trafficScore":69.4001682637463,"conversionScore":11.90428134069794,"efficiencyScore":12.755425824175823,"healthScore":32.408907200315916},{"date":"2026-05-27","label":"05/27","sessions":2,"gmv":0,"netOrders":0,"orders":0,"spend":447.38,"exposure":3239,"viewers":438,"productExposure":327,"productClicks":35,"buyers":0,"avgStaySeconds":128,"exposureWatchRate":0.13522692188947205,"interactionRate":0.0289,"productClickRate":0.10703363914373089,"clickDealRate":0,"watchDealRate":0,"uvValue":0,"netRoi":0,"dailyRoi":0,"gpm":0,"sevenDayRoi":0,"screenGmv":199,"videoGmv":0,"screenSpend":247.04000000000002,"videoSpend":164.75,"screenRoi":0.8055375647668394,"videoRoi":0,"videoClickRate":0.0668,"videoConversionRate":0,"resultScore":0,"trafficScore":74.08333333333334,"conversionScore":17.83893985728848,"efficiencyScore":0,"healthScore":22.980568297655456},{"date":"2026-05-28","label":"05/28","sessions":2,"gmv":2587,"netOrders":13,"orders":13,"spend":3533.11,"exposure":11914,"viewers":1477,"productExposure":1217,"productClicks":172,"buyers":13,"avgStaySeconds":104.13744075829383,"exposureWatchRate":0.12397179788484136,"interactionRate":0.04197535545023697,"productClickRate":0.14133114215283485,"clickDealRate":0.0755813953488372,"watchDealRate":0.008801624915368992,"uvValue":1.7515233581584293,"netRoi":0.506918833548913,"dailyRoi":0.7322160929039854,"gpm":0,"sevenDayRoi":0.5104083371307432,"screenGmv":796,"videoGmv":1791,"screenSpend":854.35,"videoSpend":2534.94,"screenRoi":0.9317024638614151,"videoRoi":0.7065255982390115,"videoClickRate":0.0794,"videoConversionRate":0.012228260869565218,"resultScore":77.72357723577235,"trafficScore":100,"conversionScore":84.38618813871794,"efficiencyScore":56.79147408373925,"healthScore":81.8185201797607},{"date":"2026-05-29","label":"05/29","sessions":2,"gmv":597,"netOrders":3,"orders":3,"spend":1631.3,"exposure":7911,"viewers":536,"productExposure":435,"productClicks":75,"buyers":3,"avgStaySeconds":112.44962686567165,"exposureWatchRate":0.06775376058652509,"interactionRate":0.0521981343283582,"productClickRate":0.1724137931034483,"clickDealRate":0.04,"watchDealRate":0.005597014925373134,"uvValue":1.1138059701492538,"netRoi":0.3659657941519034,"dailyRoi":0.3659657941519034,"gpm":415.15,"sevenDayRoi":0.36337460920738057,"screenGmv":199,"videoGmv":199,"screenSpend":386.88,"videoSpend":1209.52,"screenRoi":0.5143713813068652,"videoRoi":0.16452807725378663,"videoClickRate":0.04549999999999999,"videoConversionRate":0.0044444444444444444,"resultScore":37.166979362101316,"trafficScore":98.20429104477611,"conversionScore":64.05901526848515,"efficiencyScore":53.71013411739979,"healthScore":61.630789472660744},{"date":"2026-06-01","label":"06/01","sessions":2,"gmv":1908,"netOrders":12,"orders":12,"spend":2483.56,"exposure":17728,"viewers":899,"productExposure":735,"productClicks":174,"buyers":11,"avgStaySeconds":131.75417130144606,"exposureWatchRate":0.050710740072202165,"interactionRate":0.048974638487208004,"productClickRate":0.23673469387755103,"clickDealRate":0.06321839080459771,"watchDealRate":0.012235817575083427,"uvValue":2.122358175750834,"netRoi":0.8012691459034612,"dailyRoi":0.7682520253184945,"gpm":438.24,"sevenDayRoi":0.7982864919712026,"screenGmv":1592,"videoGmv":597,"screenSpend":1223.42,"videoSpend":1260.14,"screenRoi":1.3012702097399094,"videoRoi":0.4737568841557287,"videoClickRate":0.0417,"videoConversionRate":0.011152416356877323,"resultScore":69.9155722326454,"trafficScore":100,"conversionScore":93.00766283524904,"efficiencyScore":90.59788144552866,"healthScore":86.31204820706745},{"date":"2026-06-02","label":"06/02","sessions":2,"gmv":3198,"netOrders":17,"orders":20,"spend":6774.87,"exposure":42200,"viewers":3336,"productExposure":2742,"productClicks":307,"buyers":20,"avgStaySeconds":85.35491606714628,"exposureWatchRate":0.0790521327014218,"interactionRate":0.03206909472422062,"productClickRate":0.11196207148067104,"clickDealRate":0.06514657980456026,"watchDealRate":0.005995203836930456,"uvValue":0.9586330935251799,"netRoi":0.46997211754616697,"dailyRoi":0.47203857786201064,"gpm":746.21,"sevenDayRoi":0.4662554705846754,"screenGmv":1592,"videoGmv":2189,"screenSpend":3619.88,"videoSpend":3155.24,"screenRoi":0.43979358431771215,"videoRoi":0.693766559754567,"videoClickRate":0.0486,"videoConversionRate":0.014925373134328358,"resultScore":96.25,"trafficScore":94.97152278177458,"conversionScore":65.7887662884468,"efficiencyScore":79.25711212908882,"healthScore":85.76613908691866},{"date":"2026-06-03","label":"06/03","sessions":3,"gmv":1084,"netOrders":5,"orders":5,"spend":3000.21,"exposure":17428,"viewers":1580,"productExposure":1260,"productClicks":153,"buyers":5,"avgStaySeconds":105.17278481012659,"exposureWatchRate":0.09065871012164334,"interactionRate":0.037090696202531644,"productClickRate":0.12142857142857143,"clickDealRate":0.032679738562091505,"watchDealRate":0.0031645569620253164,"uvValue":0.6860759493670886,"netRoi":0.33164345162505293,"dailyRoi":0.3613080417704094,"gpm":0,"sevenDayRoi":0.39749857509974296,"screenGmv":796,"videoGmv":398,"screenSpend":1151.72,"videoSpend":0,"screenRoi":0.6911402076893689,"videoRoi":0.22,"videoClickRate":null,"videoConversionRate":null,"resultScore":45.97404627892433,"trafficScore":89.29324894514768,"conversionScore":44.40317617905108,"efficiencyScore":37.3680009066032,"healthScore":55.12022261466369}],"sessions":[{"date":"2026-05-25","weekday":"一","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"07:15","endTime":"11:00","durationHours":null,"exposure":42100,"viewers":1461,"peakOnline":40,"avgOnline":7,"avgStaySeconds":53,"exposureWatchRate":0.03470308788598575,"interactionRate":0.0493,"newFans":0,"newFanClub":0,"productExposure":3000,"productClicks":86,"buyers":1,"orders":1,"productClickRate":0.028666666666666667,"clickDealRate":0.011627906976744186,"watchDealRate":0.0006844626967830253,"singleGmv":199,"dailyGmv":199,"singleRoi":0.07653846153846154,"dailyRoi":null,"spend":2600,"gpm":125.95,"netRoi":0.07653846153846154,"netAmount":199,"netOrders":1,"sevenDayRoi":0.08,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":2585.41,"screenOrders":1,"screenGmv":199,"screenRoi":0.07697038380759726,"screenConversionRate":null,"videoSpend":9.28,"videoClicks":16,"videoClickRate":0.1176,"videoOrders":0,"videoGmv":0,"videoRoi":0,"videoConversionRate":0,"label":"05/25上午","gmv":199,"uvValue":0.13620807665982204,"resultScore":29.055659787367105,"trafficScore":69.4001682637463,"conversionScore":11.90428134069794,"efficiencyScore":12.755425824175823,"healthScore":32.408907200315916},{"date":"2026-05-27","weekday":"三","account":"核桃编程头脑工厂专卖店","host":"王昱","operator":"青倩芸","startTime":"07:03","endTime":"09:02","durationHours":null,"exposure":1267,"viewers":173,"peakOnline":9,"avgOnline":4,"avgStaySeconds":128,"exposureWatchRate":0.13654301499605367,"interactionRate":0.0289,"newFans":1,"newFanClub":0,"productExposure":131,"productClicks":15,"buyers":0,"orders":0,"productClickRate":0.11450381679389313,"clickDealRate":0,"watchDealRate":0,"singleGmv":0,"dailyGmv":0,"singleRoi":0,"dailyRoi":null,"spend":166.29,"gpm":0,"netRoi":0,"netAmount":0,"netOrders":0,"sevenDayRoi":0,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":117.11,"screenOrders":0,"screenGmv":0,"screenRoi":0,"screenConversionRate":null,"videoSpend":41.32,"videoClicks":15,"videoClickRate":0.0682,"videoOrders":0,"videoGmv":0,"videoRoi":0,"videoConversionRate":0,"label":"05/27上午 07:03","gmv":0,"uvValue":0,"resultScore":0,"trafficScore":74.08333333333334,"conversionScore":17.83893985728848,"efficiencyScore":0,"healthScore":22.980568297655456},{"date":"2026-05-27","weekday":"三","account":"核桃编程头脑工厂专卖店","host":"王昱","operator":"青倩芸","startTime":"09:08","endTime":"11:30","durationHours":null,"exposure":1972,"viewers":265,"peakOnline":9,"avgOnline":4,"avgStaySeconds":128,"exposureWatchRate":0.1343813387423935,"interactionRate":0.0289,"newFans":1,"newFanClub":0,"productExposure":196,"productClicks":20,"buyers":0,"orders":0,"productClickRate":0.10204081632653061,"clickDealRate":0,"watchDealRate":0,"singleGmv":0,"dailyGmv":null,"singleRoi":0,"dailyRoi":null,"spend":281.09,"gpm":0,"netRoi":0,"netAmount":0,"netOrders":0,"sevenDayRoi":0,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":129.93,"screenOrders":1,"screenGmv":199,"screenRoi":1.5315939351958747,"screenConversionRate":null,"videoSpend":123.43,"videoClicks":30,"videoClickRate":0.0661,"videoOrders":0,"videoGmv":0,"videoRoi":0,"videoConversionRate":0,"label":"05/27上午 09:08","gmv":0,"uvValue":0,"resultScore":0,"trafficScore":74.08333333333334,"conversionScore":17.83893985728848,"efficiencyScore":0,"healthScore":22.980568297655456},{"date":"2026-05-28","weekday":"四","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"李梓烨","startTime":"07:07","endTime":"07:57","durationHours":null,"exposure":714,"viewers":80,"peakOnline":7,"avgOnline":3,"avgStaySeconds":124,"exposureWatchRate":0.11204481792717087,"interactionRate":0.0625,"newFans":1,"newFanClub":0,"productExposure":60,"productClicks":9,"buyers":0,"orders":0,"productClickRate":0.15,"clickDealRate":0,"watchDealRate":0,"singleGmv":0,"dailyGmv":2587,"singleRoi":0,"dailyRoi":null,"spend":65.17,"gpm":0,"netRoi":0,"netAmount":0,"netOrders":0,"sevenDayRoi":0,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":32.52,"screenOrders":0,"screenGmv":0,"screenRoi":0,"screenConversionRate":null,"videoSpend":2534.94,"videoClicks":736,"videoClickRate":0.0794,"videoOrders":9,"videoGmv":1791,"videoRoi":0.7065255982390115,"videoConversionRate":0.012228260869565218,"label":"05/28上午 07:07","gmv":0,"uvValue":0,"resultScore":77.72357723577235,"trafficScore":100,"conversionScore":84.38618813871794,"efficiencyScore":56.79147408373925,"healthScore":81.8185201797607},{"date":"2026-05-28","weekday":"四","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"李梓烨","startTime":"08:06","endTime":"12:00","durationHours":null,"exposure":11200,"viewers":1397,"peakOnline":73,"avgOnline":12,"avgStaySeconds":103,"exposureWatchRate":0.12473214285714286,"interactionRate":0.0408,"newFans":20,"newFanClub":0,"productExposure":1157,"productClicks":163,"buyers":13,"orders":13,"productClickRate":0.14088159031979255,"clickDealRate":0.07975460122699386,"watchDealRate":0.009305654974946313,"singleGmv":2587,"dailyGmv":null,"singleRoi":0.7459759972779229,"dailyRoi":null,"spend":3467.94,"gpm":1159.8,"netRoi":0.5164449211924081,"netAmount":1791,"netOrders":13,"sevenDayRoi":0.52,"refund1hRate":0.3077,"refundBeforeShipRate":0.3077,"platformSubsidy":18,"screenSpend":821.83,"screenOrders":4,"screenGmv":796,"screenRoi":0.9685701422435297,"screenConversionRate":null,"videoSpend":null,"videoClicks":null,"videoClickRate":null,"videoOrders":null,"videoGmv":null,"videoRoi":null,"videoConversionRate":null,"label":"05/28上午 08:06","gmv":2587,"uvValue":1.8518253400143163,"resultScore":77.72357723577235,"trafficScore":100,"conversionScore":84.38618813871794,"efficiencyScore":56.79147408373925,"healthScore":81.8185201797607},{"date":"2026-05-29","weekday":"五","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"李梓烨","startTime":"07:13","endTime":"08:03","durationHours":null,"exposure":4113,"viewers":283,"peakOnline":17,"avgOnline":7,"avgStaySeconds":61,"exposureWatchRate":0.0688062241672745,"interactionRate":0.0353,"newFans":0,"newFanClub":0,"productExposure":229,"productClicks":33,"buyers":1,"orders":1,"productClickRate":0.14410480349344978,"clickDealRate":0.030303030303030304,"watchDealRate":0.0035335689045936395,"singleGmv":199,"dailyGmv":null,"singleRoi":0.21253871622343268,"dailyRoi":null,"spend":936.3,"gpm":415.15,"netRoi":0.21253871622343268,"netAmount":199,"netOrders":1,"sevenDayRoi":0.21,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":134.02,"screenOrders":0,"screenGmv":0,"screenRoi":0,"screenConversionRate":null,"videoSpend":1209.52,"videoClicks":225,"videoClickRate":0.0455,"videoOrders":1,"videoGmv":199,"videoRoi":0.16,"videoConversionRate":0.0044444444444444444,"label":"05/29上午 07:13","gmv":199,"uvValue":0.7031802120141343,"resultScore":37.166979362101316,"trafficScore":98.20429104477611,"conversionScore":64.05901526848515,"efficiencyScore":53.71013411739979,"healthScore":61.630789472660744},{"date":"2026-05-29","weekday":"五","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"李梓烨","startTime":"08:12","endTime":"11:00","durationHours":null,"exposure":3798,"viewers":253,"peakOnline":4,"avgOnline":9,"avgStaySeconds":170,"exposureWatchRate":0.0666140073723012,"interactionRate":0.0711,"newFans":4,"newFanClub":0,"productExposure":206,"productClicks":42,"buyers":2,"orders":2,"productClickRate":0.20388349514563106,"clickDealRate":0.047619047619047616,"watchDealRate":0.007905138339920948,"singleGmv":398,"dailyGmv":null,"singleRoi":0.5726618705035971,"dailyRoi":null,"spend":695,"gpm":1150,"netRoi":0.5726618705035971,"netAmount":398,"netOrders":2,"sevenDayRoi":0.57,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":252.86,"screenOrders":1,"screenGmv":199,"screenRoi":0.7869967570987898,"screenConversionRate":null,"videoSpend":null,"videoClicks":null,"videoClickRate":null,"videoOrders":null,"videoGmv":null,"videoRoi":null,"videoConversionRate":null,"label":"05/29上午 08:12","gmv":398,"uvValue":1.5731225296442688,"resultScore":37.166979362101316,"trafficScore":98.20429104477611,"conversionScore":64.05901526848515,"efficiencyScore":53.71013411739979,"healthScore":61.630789472660744},{"date":"2026-06-01","weekday":"一","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"07:13","endTime":"09:20","durationHours":null,"exposure":4128,"viewers":276,"peakOnline":6,"avgOnline":12,"avgStaySeconds":147,"exposureWatchRate":0.06686046511627906,"interactionRate":0.0435,"newFans":3,"newFanClub":0,"productExposure":220,"productClicks":55,"buyers":1,"orders":1,"productClickRate":0.25,"clickDealRate":0.01818181818181818,"watchDealRate":0.0036231884057971015,"singleGmv":149,"dailyGmv":null,"singleRoi":0.2540104672769737,"dailyRoi":null,"spend":586.59,"gpm":438.24,"netRoi":0.3392488791148843,"netAmount":199,"netOrders":1,"sevenDayRoi":0.34,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":196.49,"screenOrders":1,"screenGmv":199,"screenRoi":1.0127741869815257,"screenConversionRate":null,"videoSpend":1260.14,"videoClicks":269,"videoClickRate":0.0417,"videoOrders":3,"videoGmv":597,"videoRoi":0.57,"videoConversionRate":0.011152416356877323,"label":"06/01上午 07:13","gmv":149,"uvValue":0.5398550724637681,"resultScore":69.9155722326454,"trafficScore":100,"conversionScore":93.00766283524904,"efficiencyScore":90.59788144552866,"healthScore":86.31204820706745},{"date":"2026-06-01","weekday":"一","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"09:31","endTime":"12:00","durationHours":null,"exposure":13600,"viewers":623,"peakOnline":23,"avgOnline":10,"avgStaySeconds":125,"exposureWatchRate":0.04580882352941176,"interactionRate":0.0514,"newFans":10,"newFanClub":1,"productExposure":515,"productClicks":119,"buyers":10,"orders":11,"productClickRate":0.23106796116504855,"clickDealRate":0.08403361344537816,"watchDealRate":0.016051364365971106,"singleGmv":1759,"dailyGmv":null,"singleRoi":0.9272682224811146,"dailyRoi":null,"spend":1896.97,"gpm":2371.54,"netRoi":0.9441372293710496,"netAmount":1791,"netOrders":11,"sevenDayRoi":0.94,"refund1hRate":0.1667,"refundBeforeShipRate":0.1667,"platformSubsidy":79.32,"screenSpend":1026.93,"screenOrders":7,"screenGmv":1393,"screenRoi":1.3564702560057647,"screenConversionRate":null,"videoSpend":null,"videoClicks":null,"videoClickRate":null,"videoOrders":null,"videoGmv":null,"videoRoi":null,"videoConversionRate":null,"label":"06/01上午 09:31","gmv":1759,"uvValue":2.823434991974318,"resultScore":69.9155722326454,"trafficScore":100,"conversionScore":93.00766283524904,"efficiencyScore":90.59788144552866,"healthScore":86.31204820706745},{"date":"2026-06-02","weekday":"二","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"07:09","endTime":"10:02","durationHours":null,"exposure":20300,"viewers":2159,"peakOnline":81,"avgOnline":22,"avgStaySeconds":91,"exposureWatchRate":0.10635467980295567,"interactionRate":0.0278,"newFans":31,"newFanClub":1,"productExposure":1776,"productClicks":170,"buyers":13,"orders":13,"productClickRate":0.09572072072072071,"clickDealRate":0.07647058823529412,"watchDealRate":0.006021306160259379,"singleGmv":2058,"dailyGmv":null,"singleRoi":0.5293182648237407,"dailyRoi":null,"spend":3888.02,"gpm":746.21,"netRoi":0.563011507142453,"netAmount":2189,"netOrders":11,"sevenDayRoi":0.56,"refund1hRate":0.1538,"refundBeforeShipRate":0.1538,"platformSubsidy":41.94,"screenSpend":1885.03,"screenOrders":5,"screenGmv":995,"screenRoi":0.5278430582006652,"screenConversionRate":null,"videoSpend":3155.24,"videoClicks":737,"videoClickRate":0.0486,"videoOrders":11,"videoGmv":2189,"videoRoi":0.69,"videoConversionRate":0.014925373134328358,"label":"06/02上午 07:09","gmv":2058,"uvValue":0.953219082908754,"resultScore":96.25,"trafficScore":94.97152278177458,"conversionScore":65.7887662884468,"efficiencyScore":79.25711212908882,"healthScore":85.76613908691866},{"date":"2026-06-02","weekday":"二","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"10:18","endTime":"12:00","durationHours":null,"exposure":21900,"viewers":1177,"peakOnline":46,"avgOnline":17,"avgStaySeconds":75,"exposureWatchRate":0.053744292237442925,"interactionRate":0.0399,"newFans":19,"newFanClub":0,"productExposure":966,"productClicks":137,"buyers":7,"orders":7,"productClickRate":0.14182194616977226,"clickDealRate":0.051094890510948905,"watchDealRate":0.00594732370433305,"singleGmv":1140,"dailyGmv":null,"singleRoi":0.39489408871261067,"dailyRoi":null,"spend":2886.85,"gpm":721.13,"netRoi":0.34466633181495404,"netAmount":995,"netOrders":6,"sevenDayRoi":0.34,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":1734.85,"screenOrders":3,"screenGmv":597,"screenRoi":0.3441219701991527,"screenConversionRate":null,"videoSpend":null,"videoClicks":null,"videoClickRate":null,"videoOrders":null,"videoGmv":null,"videoRoi":null,"videoConversionRate":null,"label":"06/02上午 10:18","gmv":1140,"uvValue":0.9685641461342396,"resultScore":96.25,"trafficScore":94.97152278177458,"conversionScore":65.7887662884468,"efficiencyScore":79.25711212908882,"healthScore":85.76613908691866},{"date":"2026-06-03","weekday":"三","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"07:07","endTime":"07:55","durationHours":null,"exposure":5671,"viewers":376,"peakOnline":20,"avgOnline":10,"avgStaySeconds":63,"exposureWatchRate":0.06630223946393934,"interactionRate":0.0203,"newFans":4,"newFanClub":0,"productExposure":288,"productClicks":33,"buyers":0,"orders":0,"productClickRate":0.11458333333333333,"clickDealRate":0,"watchDealRate":0,"singleGmv":0,"dailyGmv":0,"singleRoi":0,"dailyRoi":null,"spend":864.18,"gpm":0,"netRoi":0,"netAmount":0,"netOrders":0,"sevenDayRoi":0,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":230.11,"screenOrders":0,"screenGmv":0,"screenRoi":0,"screenConversionRate":null,"videoSpend":null,"videoClicks":null,"videoClickRate":null,"videoOrders":2,"videoGmv":398,"videoRoi":0.22,"videoConversionRate":null,"label":"06/03上午 07:07","gmv":0,"uvValue":0,"resultScore":45.97404627892433,"trafficScore":89.29324894514768,"conversionScore":44.40317617905108,"efficiencyScore":37.3680009066032,"healthScore":55.12022261466369},{"date":"2026-06-03","weekday":"三","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"08:08","endTime":"10:25","durationHours":null,"exposure":8734,"viewers":875,"peakOnline":34,"avgOnline":15,"avgStaySeconds":129,"exposureWatchRate":0.10018319212273873,"interactionRate":0.0434,"newFans":8,"newFanClub":1,"productExposure":712,"productClicks":97,"buyers":5,"orders":5,"productClickRate":0.13623595505617977,"clickDealRate":0.05154639175257732,"watchDealRate":0.005714285714285714,"singleGmv":1084,"dailyGmv":0,"singleRoi":0.6544471008717911,"dailyRoi":null,"spend":1656.36,"gpm":892.18,"netRoi":0.6007148204496607,"netAmount":995,"netOrders":5,"sevenDayRoi":0.72,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":710.75,"screenOrders":4,"screenGmv":796,"screenRoi":1.1199437214210342,"screenConversionRate":null,"videoSpend":null,"videoClicks":null,"videoClickRate":null,"videoOrders":null,"videoGmv":null,"videoRoi":null,"videoConversionRate":null,"label":"06/03上午 08:08","gmv":1084,"uvValue":1.2388571428571429,"resultScore":45.97404627892433,"trafficScore":89.29324894514768,"conversionScore":44.40317617905108,"efficiencyScore":37.3680009066032,"healthScore":55.12022261466369},{"date":"2026-06-03","weekday":"三","account":"核桃编程头脑工厂专卖店","host":"陈凯","operator":"青倩芸","startTime":"10:37","endTime":"11:30","durationHours":null,"exposure":3023,"viewers":329,"peakOnline":26,"avgOnline":11,"avgStaySeconds":90,"exposureWatchRate":0.10883228580879921,"interactionRate":0.0395,"newFans":4,"newFanClub":0,"productExposure":260,"productClicks":23,"buyers":0,"orders":0,"productClickRate":0.08846153846153847,"clickDealRate":0,"watchDealRate":0,"singleGmv":0,"dailyGmv":0,"singleRoi":0,"dailyRoi":null,"spend":479.67,"gpm":0,"netRoi":0,"netAmount":0,"netOrders":0,"sevenDayRoi":0,"refund1hRate":0,"refundBeforeShipRate":0,"platformSubsidy":0,"screenSpend":210.86,"screenOrders":0,"screenGmv":0,"screenRoi":0,"screenConversionRate":null,"videoSpend":null,"videoClicks":null,"videoClickRate":null,"videoOrders":null,"videoGmv":null,"videoRoi":null,"videoConversionRate":null,"label":"06/03上午 10:37","gmv":0,"uvValue":0,"resultScore":45.97404627892433,"trafficScore":89.29324894514768,"conversionScore":44.40317617905108,"efficiencyScore":37.3680009066032,"healthScore":55.12022261466369}],"kpis":{"scope":"currentWeek","weekStart":"2026-06-01","weekEnd":"2026-06-03","weekFullEnd":"2026-06-07","totalGmv":6190,"totalNetRoi":0.5032369006676107,"totalRoi":0.5049499781378685,"totalOrders":37,"lastDate":"2026-06-03","prevDate":"2026-06-02","gmvDoD":-0.6610381488430269,"roiDoD":-0.2943337716359855,"ordersDoD":-0.75},"conclusion":["本周截至今日（2026-06-01至2026-06-03）累计GMV ¥6,190，总成交ROI 0.50，总订单 37 单，当前判断偏向「调整」。","最近一场/日 GMV ¥1,084，较上一开播日下降66.1%；直播健康指数回落30.6分，用于辅助判断整体趋势。","主要瓶颈在商品点击、点击成交，需要结合停留、互动和点击成交一起看。","全域投放下仅比较画面与视频，目前视频效率更高，ROI 0.72。"],"diagnostics":{"days":7,"sessions":14,"dateRange":"2026-05-25 ~ 2026-06-03","missing":{"gmv":0,"netRoi":0,"netOrders":0,"viewers":0,"productClicks":0,"buyers":0,"spend":0,"screenGmv":0,"videoGmv":0},"formulaLike":{"直播间曝光观看率":30,"商品曝光点击率":30,"观看-商品曝光率":30,"点击-成交":30,"单场看播-成交":32,"单日看播-成交":20,"单日GMV":5,"单场ROI":29,"单日ROI":19,"时均产出GMV":29,"时均产出单量":29,"单场获客成本":21,"单日获客成本":15,"净成交订单成本":10,"整体点击率":32,"直播间互动成本":32,"直播间看播成本":32,"直播间曝光成本":32,"点击率":32,"看播成本":32,"画面成交GMV":28,"画面成交ROI":32,"画面转化成本":32,"画面转化率":32,"视频消耗占比":2,"视频成交金额占比":7,"视频ROI":3,"视频获客成本":20,"视频转化率":21,"整体转化率":20},"columns":["直播日期","星期","直播账号","主播","投放","直播运营","场次开始时间","场次结束时间","直播时长h","时长换算","直播间","观看人数","在线人数峰值","平均在线人数","平均停留时长","直播间曝光观看率","直播间观看互动率","新增粉丝","加粉成本","新增粉丝团","商品","商品","成交人数","成交件数","商品曝光点击率","观看-商品曝光率","点击-成交","单场看播-成交","单日看播-成交","单场GMV","单日GMV","单场ROI","单日ROI","时均产出GMV","时均产出单量","单场获客成本","单日获客成本","ROI出价","账户名称","整体消耗","GPM","净成交ROI","净成交金额","净成交订单成本","净成交订单数","7日结算ROI","直播间整体评论次数","直播间整体观看次数","直播间整体曝光次数","整体点击率","直播间整体商品点击率","直播间整体商品点击成交率","1小时内退款率","发货前退款率","整体成交智能优惠券金额","电商平台补贴金额","直播间互动成本","直播间看播成本","直播间曝光成本","画面消耗","画面消耗占比","画面成交金额占比","曝光数","观看数","点击率","看播成本","画面成交单数","画面成交GMV","画面成交ROI","画面转化成本","画面转化率","视频消耗","视频消耗占比","视频成交金额占比","曝光数","点击次数","点击率","看播成本","视频成交单数","视频成交GMV","视频ROI","视频获客成本","视频转化率","整体转化率"]}};
+const state = { mode: "daily", start: "", end: "" };
+const colors = { blue:"#2563eb", teal:"#0f766e", gold:"#b7791f", rose:"#be123c", green:"#15803d", red:"#c2410c", gray:"#66716f" };
+const fmt = {
+  money:n=>Number.isFinite(n)?(Math.abs(n)>=10000?"¥"+(n/10000).toFixed(2)+"万":"¥"+Math.round(n).toLocaleString("zh-CN")):"-",
+  int:n=>Number.isFinite(n)?Math.round(n).toLocaleString("zh-CN"):"-",
+  pct:n=>Number.isFinite(n)?(n*100).toFixed(n < .1 ? 2 : 1)+"%":"-",
+  ratio:n=>Number.isFinite(n)?n.toFixed(2):"-",
+  sec:n=>Number.isFinite(n)?Math.floor(n/60)+"分"+Math.round(n%60)+"秒":"-",
+  num:n=>Number.isFinite(n)?(Math.abs(n)>=10000?(n/10000).toFixed(1)+"万":Math.round(n).toLocaleString("zh-CN")):"-"
+};
+function filteredBase() {
+  const data = state.mode === "daily" ? DASHBOARD_DATA.daily : DASHBOARD_DATA.sessions;
+  return data.filter(d => (!state.start || d.date >= state.start) && (!state.end || d.date <= state.end));
+}
+function safeDivClient(a, b) {
+  return b && Number.isFinite(a) && Number.isFinite(b) ? a / b : null;
+}
+function filteredDaily() {
+  return DASHBOARD_DATA.daily.filter(d => (!state.start || d.date >= state.start) && (!state.end || d.date <= state.end));
+}
+function allDates() {
+  return DASHBOARD_DATA.daily.map(d => d.date);
+}
+function getPreviousLiveDay(date) {
+  const days = DASHBOARD_DATA.daily.filter(d => d.date < date);
+  return days[days.length - 1] || null;
+}
+function scopeInfo() {
+  const dates = allDates();
+  const start = state.start || dates[0] || "";
+  const end = state.end || dates[dates.length - 1] || "";
+  const latest = dates[dates.length - 1] || "";
+  const weekStart = DASHBOARD_DATA.kpis.weekStart;
+  if (start === dates[0] && end === latest) return { short:"全部", title:"全部数据结论摘要", gmv:"全部累计GMV" };
+  if (start === weekStart && end === latest) return { short:"本周至今", title:"本周至今结论摘要", gmv:"本周至今累计GMV" };
+  return { short:"筛选范围", title:"筛选范围结论摘要", gmv:"筛选范围累计GMV" };
+}
+function trendText(now, prev, unit) {
+  if (!Number.isFinite(now) || !Number.isFinite(prev)) return "暂无可比数据";
+  if (prev === 0) return now > 0 ? "由0转正" : "持平";
+  const p = (now - prev) / prev;
+  return (p >= 0 ? "提升" : "回落") + Math.abs(p * 100).toFixed(1) + "%" + (unit || "");
+}
+function weekStartOf(dateISO) {
+  const d = new Date(dateISO + "T00:00:00+08:00");
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function groupedByWeek(data) {
+  const map = new Map();
+  data.forEach(d => {
+    const key = weekStartOf(d.date);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(d);
+  });
+  return Array.from(map.entries()).map(([week, rows]) => ({ week, rows }));
+}
+function insightCard(title, main, sub) {
+  return '<div class="insight-card"><strong>' + title + '</strong><span>' + main + '</span>' + (sub ? '<span>' + sub + '</span>' : '') + '</div>';
+}
+function buildFunnelInsight(data) {
+  if (!data.length) return insightCard("结论", "当前筛选范围没有数据", "");
+  const exposure = data.reduce((a,d)=>a+(d.exposure||0),0);
+  const viewers = data.reduce((a,d)=>a+(d.viewers||0),0);
+  const productExposure = data.reduce((a,d)=>a+(d.productExposure||0),0);
+  const productClicks = data.reduce((a,d)=>a+(d.productClicks||0),0);
+  const buyers = data.reduce((a,d)=>a+(d.buyers||0),0);
+  const rates = [
+    ["曝光进房", viewers / exposure, DASHBOARD_DATA.targets.exposureWatchRateLow],
+    ["看播到商品曝光", productExposure / viewers, 0.2],
+    ["商品曝光点击", productClicks / productExposure, DASHBOARD_DATA.targets.productClickRate],
+    ["点击成交", buyers / productClicks, DASHBOARD_DATA.targets.clickDealRate],
+  ].filter(x => Number.isFinite(x[1]));
+  const weak = rates.sort((a,b)=>(a[1]/a[2])-(b[1]/b[2]))[0];
+  const weeks = groupedByWeek(data).map(g => {
+    const clicks = g.rows.reduce((a,d)=>a+(d.productClicks||0),0);
+    const exp = g.rows.reduce((a,d)=>a+(d.productExposure||0),0);
+    const b = g.rows.reduce((a,d)=>a+(d.buyers||0),0);
+    return g.week + " 商品点击" + fmt.pct(clicks/exp) + " / 点击成交" + fmt.pct(b/clicks);
+  }).join("；");
+  return insightCard("整体短板", weak ? weak[0] : "暂无明显短板", weak ? "当前转化率 " + fmt.pct(weak[1]) : "")
+    + insightCard("分周对比", weeks || "周数据不足", "");
+}
+function buildQualityInsight(data) {
+  if (data.length < 2) return insightCard("趋势判断", "当前只有一个数据点", "适合看达标，不适合判断趋势");
+  const first = data[0], last = data[data.length - 1];
+  const weeks = groupedByWeek(data).map(g => {
+    const viewers = g.rows.reduce((a,d)=>a+(d.viewers||0),0);
+    const gmv = g.rows.reduce((a,d)=>a+(d.gmv||0),0);
+    const stay = g.rows.reduce((a,d)=>a+(d.avgStaySeconds||0)*(d.viewers||0),0) / viewers;
+    const clicks = g.rows.reduce((a,d)=>a+(d.productClicks||0),0);
+    const buyers = g.rows.reduce((a,d)=>a+(d.buyers||0),0);
+    return g.week + " 停留" + fmt.sec(stay) + " / 点击成交" + fmt.pct(buyers/clicks) + " / UV" + fmt.money(gmv/viewers);
+  }).join("；");
+  const sameDirection = (last.avgStaySeconds - first.avgStaySeconds) * (last.uvValue - first.uvValue) >= 0;
+  return insightCard("整体关系", "停留" + trendText(last.avgStaySeconds, first.avgStaySeconds) + "；UV价值" + trendText(last.uvValue, first.uvValue), sameDirection ? "停留与价值大体同向" : "停留与价值出现背离")
+    + insightCard("分周对比", weeks || "周数据不足", "");
+}
+function buildSummary(data) {
+  if (!data.length) return ["当前筛选范围没有直播数据。"];
+  const info = scopeInfo();
+  const last = data[data.length - 1];
+  const prev = state.mode === "daily" ? getPreviousLiveDay(last.date) : (DASHBOARD_DATA.sessions.filter(x => x.date < last.date || (x.date === last.date && (x.startTime || "") < (last.startTime || ""))).slice(-1)[0] || null);
+  const totalGmv = data.reduce((a,x)=>a+(x.gmv||0),0);
+  const totalSpend = data.reduce((a,x)=>a+(x.spend||0),0);
+  const totalRoi = totalGmv / totalSpend;
+  const totalOrders = data.reduce((a,x)=>a+(x.orders||0),0);
+  const healthTrend = prev && Number.isFinite(last.healthScore) && Number.isFinite(prev.healthScore)
+    ? (last.healthScore >= prev.healthScore ? "上升" : "回落") + Math.abs(last.healthScore - prev.healthScore).toFixed(1) + "分"
+    : "暂无可比数据";
+  const bottlenecks = [
+    last.productClickRate < DASHBOARD_DATA.targets.productClickRate ? "商品点击" : null,
+    last.clickDealRate < DASHBOARD_DATA.targets.clickDealRate ? "点击成交" : null,
+    last.avgStaySeconds < DASHBOARD_DATA.targets.staySeconds ? "停留" : null,
+    last.interactionRate < DASHBOARD_DATA.targets.interactionRate ? "互动" : null,
+  ].filter(Boolean);
+  const screenRoi = data.reduce((a,d)=>a+(d.screenGmv||0),0) / data.reduce((a,d)=>a+(d.screenSpend||0),0);
+  const videoRoi = data.reduce((a,d)=>a+(d.videoGmv||0),0) / data.reduce((a,d)=>a+(d.videoSpend||0),0);
+  const channelRows = [
+    ["画面", screenRoi],
+    ["视频", videoRoi],
+  ].filter(x => Number.isFinite(x[1])).sort((a,b)=>b[1]-a[1]);
+  const best = channelRows[0] ? channelRows[0][0] + "效率更高，ROI " + fmt.ratio(channelRows[0][1]) : "渠道ROI数据不足";
+  return [
+    info.short + "累计GMV " + fmt.money(totalGmv) + "，总成交ROI " + fmt.ratio(totalRoi) + "，总订单 " + fmt.int(totalOrders) + " 单。",
+    "最近一场/日 GMV " + fmt.money(last.gmv) + "，较上一开播日" + (prev ? trendText(last.gmv, prev.gmv) : "暂无可比数据") + "；直播健康指数" + healthTrend + "。",
+    "主要瓶颈在" + (bottlenecks.length ? bottlenecks.join("、") : "暂无明显单点短板") + "，需要结合漏斗和停留/互动关系判断。",
+    "全域投放下仅比较画面与视频，当前" + best + "。",
+  ];
+}
+function el(id){ return document.getElementById(id); }
+function checked(chart){ return Array.from(document.querySelectorAll('.toggles[data-chart="'+chart+'"] input:checked')).map(x=>x.value); }
+function setTooltip(html, x, y){ const t=el("tooltip"); t.innerHTML=html; t.style.left=x+"px"; t.style.top=y+"px"; t.style.opacity=1; }
+function hideTooltip(){ el("tooltip").style.opacity=0; }
+function scale(vals, minPad=0) {
+  const clean = vals.filter(Number.isFinite);
+  if (!clean.length) return { min:0, max:1 };
+  let min = Math.min(...clean, minPad), max = Math.max(...clean);
+  if (min === max) max = min + 1;
+  const pad = (max - min) * .12;
+  return { min: Math.max(0, min - pad), max: max + pad };
+}
+function clearSvg(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+function node(name, attrs={}){ const n=document.createElementNS("http://www.w3.org/2000/svg", name); Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v)); return n; }
+function linePath(points){ return points.map((p,i)=>(i?"L":"M")+p.x+","+p.y).join(" "); }
+function setup(svg) {
+  clearSvg(svg);
+  const w = svg.clientWidth || 700, h = svg.clientHeight || 310;
+  svg.setAttribute("viewBox", "0 0 "+w+" "+h);
+  return { w, h, m:{l:58,r:54,t:18,b:46}, plotW:w-112, plotH:h-64 };
+}
+function drawAxes(svg, box, labels) {
+  const {w,h,m,plotW,plotH}=box;
+  for (let i=0;i<=4;i++) {
+    const y=m.t+plotH*i/4;
+    svg.appendChild(node("line",{x1:m.l,y1:y,x2:w-m.r,y2:y,class:"gridline"}));
+  }
+  svg.appendChild(node("line",{x1:m.l,y1:m.t+plotH,x2:w-m.r,y2:m.t+plotH,class:"axis"}));
+  labels.forEach((lab,i)=>{
+    if (labels.length>10 && i%2) return;
+    const x=m.l+(labels.length<=1?plotW/2:plotW*i/(labels.length-1));
+    const text=node("text",{x,y:h-16,"text-anchor":"middle",fill:"#66716f","font-size":"11"});
+    text.textContent=lab;
+    svg.appendChild(text);
+  });
+}
+function drawLineChart(svgId, seriesDefs) {
+  const data = filteredBase();
+  const svg = el(svgId), box = setup(svg);
+  const labels = data.map(d=>d.label);
+  drawAxes(svg, box, labels);
+  const leftVals = [], rightVals = [];
+  seriesDefs.forEach(s => data.forEach(d => (s.axis==="right"?rightVals:leftVals).push(d[s.key])));
+  const left = scale(leftVals), right = scale(rightVals);
+  function x(i){ return box.m.l+(data.length<=1?box.plotW/2:box.plotW*i/(data.length-1)); }
+  function y(v, sc){ return box.m.t+box.plotH-(v-sc.min)/(sc.max-sc.min)*box.plotH; }
+  seriesDefs.forEach(s=>{
+    const sc = s.axis==="right"?right:left;
+    if (Number.isFinite(s.target) && s.target >= sc.min && s.target <= sc.max) {
+      const ty = y(s.target, sc);
+      svg.appendChild(node("line",{x1:box.m.l,y1:ty,x2:box.w-box.m.r,y2:ty,class:"target"}));
+      const label=node("text",{x:box.w-box.m.r-4,y:ty-5,"text-anchor":"end",fill:colors.red,"font-size":"11"});
+      label.textContent=s.name+"目标 "+s.fmt(s.target);
+      svg.appendChild(label);
+    }
+    const pts = data.map((d,i)=>({x:x(i), y:y(d[s.key], sc), d})).filter(p=>Number.isFinite(p.d[s.key]));
+    if (pts.length>1) svg.appendChild(node("path",{d:linePath(pts),fill:"none",stroke:s.color,"stroke-width":2.5}));
+    pts.forEach(p=>{
+      const c=node("circle",{cx:p.x,cy:p.y,r:4,fill:s.color});
+      c.addEventListener("mousemove",e=>setTooltip("<b>"+p.d.label+"</b><br>"+s.name+"："+s.fmt(p.d[s.key]),e.clientX,e.clientY));
+      c.addEventListener("mouseleave",hideTooltip);
+      svg.appendChild(c);
+    });
+  });
+}
+function drawFunnel() {
+  const data = filteredBase();
+  const totals = [
+    ["曝光人数", data.reduce((a,d)=>a+(d.exposure||0),0), DASHBOARD_DATA.targets.exposureWatchRateLow, null],
+    ["观看人数", data.reduce((a,d)=>a+(d.viewers||0),0), null, "曝光观看率"],
+    ["商品曝光人数", data.reduce((a,d)=>a+(d.productExposure||0),0), null, "观看-商品曝光"],
+    ["商品点击人数", data.reduce((a,d)=>a+(d.productClicks||0),0), DASHBOARD_DATA.targets.productClickRate, "商品曝光点击率"],
+    ["成交人数", data.reduce((a,d)=>a+(d.buyers||0),0), DASHBOARD_DATA.targets.clickDealRate, "点击-成交率"]
+  ];
+  const svg=el("funnelChart"), box=setup(svg), max=Math.max(1,...totals.map(x=>x[1]));
+  const cx=box.w/2, top=26, rowH=56;
+  totals.forEach((item,i)=>{
+    const width = Math.max(70, (item[1]/max) * (box.w-110));
+    const x = cx - width/2, y = top+i*rowH;
+    const rate = i===0?null:(item[1]/(totals[i-1][1]||NaN));
+    const target = i===1 ? DASHBOARD_DATA.targets.exposureWatchRateLow : item[2];
+    const ok = target == null || rate >= target;
+    const rect=node("rect",{x,y,width,height:36,rx:6,fill: ok ? "#dff3e7" : "#fde8df", stroke: ok ? colors.green : colors.red});
+    rect.addEventListener("mousemove",e=>setTooltip("<b>"+item[0]+"</b><br>人数："+fmt.num(item[1])+(rate?("<br>"+item[3]+"："+fmt.pct(rate)):""),e.clientX,e.clientY));
+    rect.addEventListener("mouseleave",hideTooltip);
+    svg.appendChild(rect);
+    const t=node("text",{x:cx,y:y+23,"text-anchor":"middle",fill:"#1d2524","font-size":"13","font-weight":"650"});
+    t.textContent=item[0]+" "+fmt.num(item[1])+(rate?" / "+fmt.pct(rate):"");
+    svg.appendChild(t);
+  });
+}
+function drawStackedBars() {
+  const data=filteredBase(), svg=el("channelStackChart"), box=setup(svg);
+  drawAxes(svg, box, data.map(d=>d.label));
+  const max=Math.max(1,...data.map(d=>(d.screenGmv||0)+(d.videoGmv||0)));
+  const bw=Math.min(34, box.plotW/Math.max(1,data.length)*.58);
+  data.forEach((d,i)=>{
+    const x=box.m.l+(data.length<=1?box.plotW/2:box.plotW*i/(data.length-1))-bw/2;
+    let y=box.m.t+box.plotH;
+    [["screenGmv",colors.gold,"画面"],["videoGmv",colors.rose,"视频"]].forEach(([key,color,name])=>{
+      const h=(d[key]||0)/max*box.plotH;
+      y-=h;
+      const r=node("rect",{x,y,width:bw,height:h,fill:color,rx:2});
+      r.addEventListener("mousemove",e=>setTooltip("<b>"+d.label+"</b><br>"+name+"GMV："+fmt.money(d[key]),e.clientX,e.clientY));
+      r.addEventListener("mouseleave",hideTooltip);
+      svg.appendChild(r);
+    });
+  });
+}
+function drawChannelRoi() {
+  const data=filteredBase(), svg=el("channelRoiChart"), box=setup(svg);
+  clearSvg(svg); svg.setAttribute("viewBox","0 0 "+box.w+" "+box.h);
+  const screenRoi = data.reduce((a,d)=>a+(d.screenGmv||0),0) / data.reduce((a,d)=>a+(d.screenSpend||0),0);
+  const videoRoi = data.reduce((a,d)=>a+(d.videoGmv||0),0) / data.reduce((a,d)=>a+(d.videoSpend||0),0);
+  const rows=[["画面",screenRoi,colors.gold],["视频",videoRoi,colors.rose]].filter(r=>Number.isFinite(r[1]));
+  const max=Math.max(1,...rows.map(r=>r[1]));
+  rows.forEach((r,i)=>{
+    const y=70+i*86, w=(box.w-170)*r[1]/max;
+    svg.appendChild(node("text",{x:28,y:y+25,fill:"#1d2524","font-size":"14","font-weight":"650"})).textContent=r[0];
+    const bar=node("rect",{x:86,y,width:w,height:36,rx:5,fill:r[2]});
+    bar.addEventListener("mousemove",e=>setTooltip(r[0]+"ROI："+fmt.ratio(r[1]),e.clientX,e.clientY));
+    bar.addEventListener("mouseleave",hideTooltip);
+    svg.appendChild(bar);
+    svg.appendChild(node("text",{x:96+w,y:y+24,fill:"#1d2524","font-size":"13"})).textContent=fmt.ratio(r[1]);
+  });
+}
+function updateKpis() {
+  const d=filteredBase();
+  const info=scopeInfo();
+  const totalGmv=d.reduce((a,x)=>a+(x.gmv||0),0);
+  const totalSpend=d.reduce((a,x)=>a+(x.spend||0),0);
+  const totalRoi=totalGmv/totalSpend;
+  const totalOrders=d.reduce((a,x)=>a+(x.orders||0),0);
+  const last=d[d.length-1]||{};
+  const prev=state.mode === "daily"
+    ? getPreviousLiveDay(last.date)
+    : (DASHBOARD_DATA.sessions.filter(x => x.date < last.date || (x.date === last.date && (x.startTime || "") < (last.startTime || ""))).slice(-1)[0] || null);
+  function delta(now, old, id) {
+    const e=el(id);
+    if (!prev || !Number.isFinite(old) || old === 0 || !Number.isFinite(now)) {
+      e.textContent="较上一开播日 -";
+      e.className="delta";
+      return;
+    }
+    const p=(now-old)/old;
+    e.textContent=(p>=0?"↑ ":"↓ ")+Math.abs(p*100).toFixed(1)+"% 较上一开播日";
+    e.className="delta "+(p>=0?"up":"down");
+  }
+  el("kpiGmvLabel").textContent=info.gmv;
+  el("kpiRoiLabel").textContent="总成交ROI";
+  el("kpiGmv").textContent=fmt.money(totalGmv);
+  el("kpiRoi").textContent=fmt.ratio(totalRoi);
+  el("kpiOrders").textContent=fmt.int(totalOrders);
+  delta(last.gmv, prev?.gmv, "kpiGmvDelta");
+  delta(last.dailyRoi ?? safeDivClient(last.gmv, last.spend), prev ? (prev.dailyRoi ?? safeDivClient(prev.gmv, prev.spend)) : null, "kpiRoiDelta");
+  delta(last.orders, prev?.orders, "kpiOrdersDelta");
+}
+function render() {
+  updateKpis();
+  const scope=scopeInfo();
+  const base=filteredBase();
+  const dayData=filteredDaily();
+  el("summaryTitle").textContent=scope.title;
+  el("summaryList").innerHTML = buildSummary(base).map(x=>"<li>"+x+"</li>").join("");
+  el("funnelInsight").innerHTML=buildFunnelInsight(dayData);
+  el("qualityInsight").innerHTML=buildQualityInsight(dayData);
+  const result = checked("result");
+  const health = checked("health");
+  drawLineChart("healthChart", [
+    health.includes("healthScore") && {key:"healthScore",name:"直播健康指数",axis:"left",color:colors.blue,fmt:n=>n.toFixed(1)+"分"},
+    health.includes("conversionScore") && {key:"conversionScore",name:"成交承接分",axis:"left",color:colors.rose,fmt:n=>n.toFixed(1)+"分"},
+    health.includes("efficiencyScore") && {key:"efficiencyScore",name:"投流效率分",axis:"left",color:colors.gold,fmt:n=>n.toFixed(1)+"分"},
+  ].filter(Boolean));
+  drawLineChart("resultChart", [
+    result.includes("gmv") && {key:"gmv",name:"GMV",axis:"left",color:colors.blue,fmt:fmt.money},
+    result.includes("netOrders") && {key:"netOrders",name:"净成交订单数",axis:"right",color:colors.teal,fmt:fmt.int},
+  ].filter(Boolean));
+  drawFunnel();
+  const quality = checked("quality");
+  drawLineChart("qualityChart", [
+    quality.includes("avgStaySeconds") && {key:"avgStaySeconds",name:"平均停留",axis:"left",color:colors.blue,fmt:fmt.sec},
+    quality.includes("interactionRate") && {key:"interactionRate",name:"互动率",axis:"right",color:colors.teal,fmt:fmt.pct,target:DASHBOARD_DATA.targets.interactionRate},
+    quality.includes("clickDealRate") && {key:"clickDealRate",name:"点击成交率",axis:"right",color:colors.rose,fmt:fmt.pct,target:DASHBOARD_DATA.targets.clickDealRate},
+    quality.includes("uvValue") && {key:"uvValue",name:"UV价值",axis:"left",color:colors.gold,fmt:n=>"¥"+(n||0).toFixed(2)},
+  ].filter(Boolean).map(s => s.key === "avgStaySeconds" ? {...s, target:DASHBOARD_DATA.targets.staySeconds} : s));
+  const spend = checked("spend");
+  drawLineChart("spendChart", [
+    spend.includes("spend") && {key:"spend",name:"整体消耗",axis:"left",color:colors.blue,fmt:fmt.money},
+    spend.includes("netRoi") && {key:"netRoi",name:"净成交ROI",axis:"right",color:colors.teal,fmt:fmt.ratio},
+    spend.includes("gpm") && {key:"gpm",name:"GPM",axis:"right",color:colors.gold,fmt:n=>n.toFixed(1)},
+    spend.includes("sevenDayRoi") && {key:"sevenDayRoi",name:"7日结算ROI",axis:"right",color:colors.rose,fmt:fmt.ratio},
+  ].filter(Boolean));
+  drawStackedBars();
+  drawChannelRoi();
+}
+function init() {
+  const dates = DASHBOARD_DATA.daily.map(d=>d.date);
+  el("startDate").value=dates[0] || "";
+  el("endDate").value=dates[dates.length-1] || DASHBOARD_DATA.kpis.weekEnd || "";
+  state.start=el("startDate").value; state.end=el("endDate").value;
+  el("startDate").addEventListener("change",e=>{state.start=e.target.value;render();});
+  el("endDate").addEventListener("change",e=>{state.end=e.target.value;render();});
+  el("dailyBtn").addEventListener("click",()=>{state.mode="daily";el("dailyBtn").classList.add("active");el("sessionBtn").classList.remove("active");render();});
+  el("sessionBtn").addEventListener("click",()=>{state.mode="session";el("sessionBtn").classList.add("active");el("dailyBtn").classList.remove("active");render();});
+  document.querySelectorAll(".toggles input").forEach(i=>i.addEventListener("change",render));
+  window.addEventListener("resize",()=>render());
+  render();
+}
+init();
+</script>
+</body>
+</html>
